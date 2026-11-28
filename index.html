@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>OZ CÔNG SỞ · Studio V13 (Cổng Bảo Mật)</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Arial, sans-serif;
+    background: radial-gradient(circle at 20% 20%, #1E293B 0%, #0B1120 65%, #020617 100%);
+    color: #F8FAFC;
+    overflow: hidden;
+  }
+  #gate {
+    min-height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  #gate.hidden { display: none; }
+  .card {
+    width: 100%;
+    max-width: 440px;
+    background: rgba(17, 24, 39, 0.94);
+    border: 2px solid #334155;
+    border-radius: 22px;
+    padding: 28px 26px;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+  }
+  .pill {
+    display: inline-block;
+    background: linear-gradient(135deg, #FACC15, #F59E0B);
+    color: #0F172A;
+    font-weight: 900;
+    font-size: 12px;
+    padding: 5px 12px;
+    border-radius: 999px;
+    margin-bottom: 12px;
+  }
+  h1 { font-size: 22px; font-weight: 900; color: #FFFFFF; line-height: 1.3; }
+  .sub { font-size: 13.5px; color: #94A3B8; margin-top: 8px; line-height: 1.5; }
+  .field { margin-top: 20px; }
+  label { display: block; font-size: 12.5px; font-weight: 800; color: #CBD5E1; margin-bottom: 7px; }
+  .pw-wrap { position: relative; display: flex; align-items: center; }
+  input[type="password"], input[type="text"] {
+    width: 100%;
+    background: #0F172A;
+    border: 2px solid #334155;
+    color: #FFFFFF;
+    border-radius: 12px;
+    padding: 12px 46px 12px 14px;
+    font: inherit;
+    font-size: 15px;
+    outline: none;
+  }
+  input:focus { border-color: #FACC15; }
+  .toggle-vis {
+    position: absolute;
+    right: 10px;
+    background: transparent;
+    border: 0;
+    color: #94A3B8;
+    font-size: 17px;
+    cursor: pointer;
+    padding: 4px 6px;
+  }
+  .submit-btn {
+    width: 100%;
+    margin-top: 16px;
+    padding: 13px;
+    border-radius: 12px;
+    border: 0;
+    background: linear-gradient(135deg, #FACC15, #F59E0B);
+    color: #0F172A;
+    font: inherit;
+    font-size: 15px;
+    font-weight: 900;
+    cursor: pointer;
+  }
+  .submit-btn:disabled { opacity: 0.6; cursor: wait; }
+  .status {
+    margin-top: 12px;
+    font-size: 13px;
+    min-height: 20px;
+    color: #FCA5A5;
+    font-weight: 700;
+  }
+  .status.ok { color: #86EFAC; }
+  .sec-note {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid #1E293B;
+    font-size: 12px;
+    color: #64748B;
+    line-height: 1.45;
+  }
+  #portal-frame {
+    display: none;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: #0B1120;
+  }
+  #portal-frame.active { display: block; }
+</style>
+</head>
+<body>
+  <main id="gate">
+    <section class="card">
+      <span class="pill">🔒 OZ CÔNG SỞ · STUDIO V13</span>
+      <h1>Đăng nhập Xưởng Phim Nội Bộ</h1>
+      <p class="sub">Toàn bộ video 30fps, 50 sắc thái Emoji và luồng S0→S5 được mã hóa AES-256-GCM trên 1 link duy nhất. Hỗ trợ mọi thiết bị, IP và trình duyệt.</p>
+      <form id="login-form">
+        <div class="field">
+          <label for="pw-input">Mật khẩu truy cập</label>
+          <div class="pw-wrap">
+            <input id="pw-input" type="password" placeholder="Nhập mật khẩu..." autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false" required />
+            <button type="button" class="toggle-vis" id="btn-eye" aria-label="Hiện hoặc ẩn mật khẩu">👁</button>
+          </div>
+        </div>
+        <button type="submit" class="submit-btn" id="btn-submit">Mở Khóa Studio V13</button>
+        <div class="status" id="status-msg"></div>
+      </form>
+      <p class="sec-note">🔐 Giải mã cục bộ trong trình duyệt qua Web Crypto + Dual-Engine (Service Worker / Direct Vault Bridge). Có thể bấm nút <strong>🔒 Khóa trang</strong> ở góc trên bất cứ lúc nào.</p>
+    </section>
+  </main>
+  <iframe id="portal-frame" allow="local-network-access; local-network; loopback-network" title="OZ Công Sở Studio V13"></iframe>
+
+<script>
+  const DB_NAME = 'oz_studio_vault_v130';
+  const LEGACY_DBS = ['oz_studio_vault_v11', 'oz_studio_vault_v125'];
+  const STORE_NAME = 'session';
+  const gateEl = document.getElementById('gate');
+  const frameEl = document.getElementById('portal-frame');
+  const formEl = document.getElementById('login-form');
+  const pwInput = document.getElementById('pw-input');
+  const btnEye = document.getElementById('btn-eye');
+  const btnSubmit = document.getElementById('btn-submit');
+  const statusMsg = document.getElementById('status-msg');
+
+  let activeSession = null;
+  let activeMode = '';
+  let swHeartbeatTimer = null;
+  let directCryptoKey = null;
+  const directPlainCache = new Map();
+
+  function buildDirectClientShimSource(docPath, docSearch = '') {
+  return `(() => {
+  const DOC_PATH = ${JSON.stringify(docPath)};
+  const DOC_SEARCH = ${JSON.stringify(docSearch)};
+  window.__OZ_DOC_PATH__ = DOC_PATH;
+  window.__OZ_DOC_SEARCH__ = DOC_SEARCH;
+  const blobCache = new Map();
+  const pendingUrls = new Map();
+  let seq = 0;
+
+  function isRelativeVaultRef(raw) {
+    if (!raw || typeof raw !== 'string') return false;
+    const s = raw.trim();
+    if (!s || s.startsWith('#')) return false;
+    return !/^(https?:|blob:|data:|mailto:|tel:|javascript:)/i.test(s);
+  }
+
+  function requestVault(rawRef, method = 'GET', asHtmlDoc = false) {
+    return new Promise((resolve, reject) => {
+      const reqId = 'oz_' + (++seq) + '_' + Date.now();
+      const onMsg = (ev) => {
+        const d = ev?.data;
+        if (!d || d.type !== 'OZ_VAULT_RES' || d.reqId !== reqId) return;
+        window.removeEventListener('message', onMsg);
+        if (d.ok) resolve(d);
+        else reject(new Error(d.error || 'Vault read failed'));
+      };
+      window.addEventListener('message', onMsg);
+      setTimeout(() => {
+        window.removeEventListener('message', onMsg);
+        reject(new Error('Vault timeout: ' + rawRef));
+      }, 20000);
+      window.top.postMessage({
+        type: 'OZ_VAULT_REQ',
+        reqId,
+        baseDocPath: DOC_PATH,
+        rawRef,
+        method,
+        asHtmlDoc,
+      }, '*');
+    });
+  }
+
+  async function resolveVaultBlobUrl(rawRef, asHtmlDoc = false) {
+    const u = new URL(rawRef, 'https://oz.local' + DOC_PATH);
+    const cacheKey = (asHtmlDoc ? 'html:' : 'raw:') + decodeURIComponent(u.pathname) + u.search;
+    if (blobCache.has(cacheKey)) return blobCache.get(cacheKey);
+    if (pendingUrls.has(cacheKey)) return pendingUrls.get(cacheKey);
+    const p = (async () => {
+      const res = await requestVault(rawRef, 'GET', asHtmlDoc);
+      const blob = new Blob([res.buf], { type: res.mime || 'application/octet-stream' });
+      const bUrl = URL.createObjectURL(blob);
+      blobCache.set(cacheKey, bUrl);
+      pendingUrls.delete(cacheKey);
+      return bUrl;
+    })().catch((err) => {
+      pendingUrls.delete(cacheKey);
+      throw err;
+    });
+    pendingUrls.set(cacheKey, p);
+    return p;
+  }
+
+  window.__ozResolveVaultUrl = (rawRef, asHtmlDoc = false) => {
+    if (!isRelativeVaultRef(rawRef)) return Promise.resolve(rawRef);
+    return resolveVaultBlobUrl(rawRef, asHtmlDoc);
+  };
+
+  const origFetch = window.fetch ? window.fetch.bind(window) : null;
+  window.fetch = async (input, init) => {
+    const rawUrl = typeof input === 'string' ? input : (input && input.url) || '';
+    const method = String((init && init.method) || (input && input.method) || 'GET').toUpperCase();
+    if (!isRelativeVaultRef(rawUrl)) {
+      return origFetch(input, init);
+    }
+    try {
+      const res = await requestVault(rawUrl, method, false);
+      return new Response(method === 'HEAD' ? null : res.buf, {
+        status: 200,
+        headers: {
+          'Content-Type': res.mime || 'application/octet-stream',
+          'Content-Length': String(res.size ?? (res.buf ? res.buf.byteLength : 0)),
+        },
+      });
+    } catch (err) {
+      return new Response(String(err?.message || 'Not Found'), { status: 404 });
+    }
+  };
+
+  const OrigAudio = window.Audio;
+  if (typeof OrigAudio === 'function') {
+    window.Audio = function patchedAudio(src) {
+      const audio = new OrigAudio();
+      if (src) {
+        if (isRelativeVaultRef(src)) {
+          resolveVaultBlobUrl(src, false).then((bUrl) => { audio.src = bUrl; }).catch(() => {});
+        } else {
+          audio.src = src;
+        }
+      }
+      return audio;
+    };
+  }
+
+  function processElement(el) {
+    if (!el || el.nodeType !== 1) return;
+    const tag = String(el.tagName || '').toUpperCase();
+    if (!['IFRAME', 'VIDEO', 'AUDIO', 'IMG', 'SOURCE', 'IMAGE'].includes(tag)) return;
+    const attr = tag === 'IMAGE' ? (el.hasAttribute('href') ? 'href' : 'xlink:href') : 'src';
+    const raw = el.getAttribute(attr);
+    if (!isRelativeVaultRef(raw)) return;
+    if (el.dataset && el.dataset.ozRawSrc === raw) return;
+    if (el.dataset) el.dataset.ozRawSrc = raw;
+    const asHtml = tag === 'IFRAME';
+    if (asHtml) el.removeAttribute(attr);
+    resolveVaultBlobUrl(raw, asHtml).then((bUrl) => {
+      el.setAttribute(attr, bUrl);
+    }).catch(() => {});
+  }
+
+  function scanRoot(root) {
+    if (!root || !root.querySelectorAll) return;
+    root.querySelectorAll('iframe, video, audio, img, source, image').forEach(processElement);
+  }
+
+  const obs = new MutationObserver((muts) => {
+    for (const m of muts) {
+      if (m.type === 'attributes') {
+        processElement(m.target);
+      } else if (m.addedNodes) {
+        m.addedNodes.forEach((n) => {
+          processElement(n);
+          scanRoot(n);
+        });
+      }
+    }
+  });
+  obs.observe(document.documentElement, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['src', 'href'],
+  });
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => scanRoot(document));
+  } else {
+    scanRoot(document);
+  }
+})();`;
+}
+
+  btnEye.addEventListener('click', () => {
+    pwInput.type = pwInput.type === 'password' ? 'text' : 'password';
+  });
+
+  function hexToBytes(hex) {
+    const out = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < out.length; i++) out[i] = parseInt(hex.substr(i * 2, 2), 16);
+    return out;
+  }
+
+  function openDb() {
+    return new Promise((resolve, reject) => {
+      if (typeof indexedDB === 'undefined') {
+        reject(new Error('No IndexedDB'));
+        return;
+      }
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = () => {
+        if (!req.result.objectStoreNames.contains(STORE_NAME)) {
+          req.result.createObjectStore(STORE_NAME);
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async function saveSession(record) {
+    try {
+      const db = await openDb();
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        tx.objectStore(STORE_NAME).put(record, 'current');
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+      });
+    } catch {}
+  }
+
+  async function loadSession() {
+    try {
+      const db = await openDb();
+      return await new Promise((resolve) => {
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const req = tx.objectStore(STORE_NAME).get('current');
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => resolve(null);
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  async function clearSession() {
+    try {
+      const db = await openDb();
+      await new Promise((resolve) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        tx.objectStore(STORE_NAME).delete('current');
+        tx.oncomplete = resolve;
+        tx.onerror = resolve;
+      });
+    } catch {}
+  }
+
+  if (typeof indexedDB !== 'undefined') {
+    for (const oldDb of LEGACY_DBS) {
+      try { indexedDB.deleteDatabase(oldDb); } catch {}
+    }
+  }
+
+  function waitWorkerActivated(worker, timeoutMs = 3500) {
+    if (!worker || worker.state === 'activated') return Promise.resolve(true);
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => resolve(worker.state === 'activated'), timeoutMs);
+      const onChange = () => {
+        if (worker.state === 'activated') {
+          clearTimeout(timer);
+          worker.removeEventListener('statechange', onChange);
+          resolve(true);
+        }
+      };
+      worker.addEventListener('statechange', onChange);
+    });
+  }
+
+  function waitForController(timeoutMs = 2500) {
+    if (navigator.serviceWorker.controller) return Promise.resolve(navigator.serviceWorker.controller);
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        navigator.serviceWorker.removeEventListener('controllerchange', onCtrl);
+        resolve(navigator.serviceWorker.controller || null);
+      }, timeoutMs);
+      const onCtrl = () => {
+        if (navigator.serviceWorker.controller) {
+          clearTimeout(timer);
+          navigator.serviceWorker.removeEventListener('controllerchange', onCtrl);
+          resolve(navigator.serviceWorker.controller);
+        }
+      };
+      navigator.serviceWorker.addEventListener('controllerchange', onCtrl);
+    });
+  }
+
+  async function ensureSwActive() {
+    if (!('serviceWorker' in navigator)) {
+      throw new Error('No Service Worker');
+    }
+    const reg = await navigator.serviceWorker.register('./sw.js', { scope: './' });
+    const cand = reg.installing || reg.waiting || reg.active;
+    if (cand) await waitWorkerActivated(cand, 3500);
+    const readyReg = await navigator.serviceWorker.ready;
+    return readyReg.active || navigator.serviceWorker.controller;
+  }
+
+  function postSwMessage(sw, payload) {
+    return new Promise((resolve, reject) => {
+      const ch = new MessageChannel();
+      const timer = setTimeout(() => reject(new Error('SW timeout')), 4500);
+      ch.port1.onmessage = (ev) => {
+        clearTimeout(timer);
+        resolve(ev.data);
+      };
+      sw.postMessage(payload, [ch.port2]);
+    });
+  }
+
+  async function probeSwHealth() {
+    try {
+      const res = await fetch('./app/__health?t=' + Date.now(), { cache: 'no-store' });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data && data.ok ? data : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function tryEnterViaServiceWorker(record) {
+    const sw = await ensureSwActive();
+    if (!sw) return false;
+    await postSwMessage(sw, { type: 'OZ_UNLOCK', keyBits: record.keyBits, files: record.files, saltHex: record.saltHex });
+    await waitForController(2500);
+    if (navigator.serviceWorker.controller && navigator.serviceWorker.controller !== sw) {
+      await postSwMessage(navigator.serviceWorker.controller, { type: 'OZ_UNLOCK', keyBits: record.keyBits, files: record.files, saltHex: record.saltHex });
+    }
+    const health = await probeSwHealth();
+    if (!health || !health.unlocked) return false;
+
+    activeMode = 'sw';
+    if (swHeartbeatTimer) clearInterval(swHeartbeatTimer);
+    swHeartbeatTimer = setInterval(async () => {
+      if (!activeSession || activeMode !== 'sw') return;
+      const h = await probeSwHealth();
+      if (!h || !h.unlocked) {
+        try {
+          const curSw = navigator.serviceWorker.controller || (await navigator.serviceWorker.getRegistration('./'))?.active;
+          if (curSw) {
+            await postSwMessage(curSw, { type: 'OZ_UNLOCK', keyBits: activeSession.keyBits, files: activeSession.files, saltHex: activeSession.saltHex });
+          }
+        } catch {}
+      }
+    }, 15000);
+
+    gateEl.classList.add('hidden');
+    frameEl.classList.add('active');
+    frameEl.src = './app/studio/index.html';
+    return true;
+  }
+
+  async function getDirectDecryptedBuffer(vaultPath) {
+    if (!activeSession || !directCryptoKey) throw new Error('Vault locked');
+    const entry = activeSession.files[vaultPath];
+    if (!entry) throw new Error('Not Found: ' + vaultPath);
+    if (directPlainCache.has(vaultPath)) return { entry, buf: directPlainCache.get(vaultPath) };
+
+    const res = await fetch('./' + entry.b, { cache: 'default' });
+    if (!res.ok) throw new Error('Cannot load blob ' + entry.b);
+    const raw = await res.arrayBuffer();
+    const plainBuf = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: new Uint8Array(raw, 0, 12) },
+      directCryptoKey,
+      new Uint8Array(raw, 12)
+    );
+    if (plainBuf.byteLength <= 12 * 1024 * 1024 && directPlainCache.size < 64) {
+      directPlainCache.set(vaultPath, plainBuf);
+    }
+    return { entry, buf: plainBuf };
+  }
+
+  async function enterViaDirectVaultBridge(record) {
+    activeMode = 'direct';
+    directPlainCache.clear();
+    directCryptoKey = await crypto.subtle.importKey('raw', new Uint8Array(record.keyBits), { name: 'AES-GCM' }, false, ['decrypt']);
+
+    const { buf } = await getDirectDecryptedBuffer('/studio/index.html');
+    const rawHtml = new TextDecoder().decode(buf);
+    const shimCode = '<script>' + buildDirectClientShimSource('/studio/index.html', '') + '<' + '/script>';
+    const patchedHtml = rawHtml.replace(/<head([^>]*)>/i, '<head$1>' + shimCode);
+    const rootBlobUrl = URL.createObjectURL(new Blob([patchedHtml], { type: 'text/html; charset=utf-8' }));
+
+    gateEl.classList.add('hidden');
+    frameEl.classList.add('active');
+    frameEl.src = rootBlobUrl;
+  }
+
+  async function enterPortal(record) {
+    activeSession = record;
+    let swReadyOk = false;
+    try {
+      swReadyOk = await tryEnterViaServiceWorker(record);
+    } catch {
+      swReadyOk = false;
+    }
+    if (!swReadyOk) {
+      await enterViaDirectVaultBridge(record);
+    }
+  }
+
+  async function lockPortal() {
+    activeSession = null;
+    activeMode = '';
+    directCryptoKey = null;
+    directPlainCache.clear();
+    if (swHeartbeatTimer) {
+      clearInterval(swHeartbeatTimer);
+      swHeartbeatTimer = null;
+    }
+    frameEl.classList.remove('active');
+    frameEl.removeAttribute('src');
+    gateEl.classList.remove('hidden');
+    pwInput.value = '';
+    statusMsg.className = 'status';
+    statusMsg.textContent = 'Đã khóa phiên truy cập an toàn.';
+    await clearSession();
+    try {
+      const sw = navigator.serviceWorker?.controller || (await navigator.serviceWorker.getRegistration('./'))?.active;
+      if (sw) await postSwMessage(sw, { type: 'OZ_LOCK' });
+    } catch {}
+  }
+
+  window.addEventListener('message', async (ev) => {
+    const d = ev?.data;
+    if (!d) return;
+    if (d.type === 'oz-studio-logout') {
+      lockPortal();
+      return;
+    }
+    if (d.type === 'OZ_VAULT_REQ' && d.reqId && activeSession && directCryptoKey) {
+      try {
+        const u = new URL(d.rawRef || '/', 'https://oz.local' + (d.baseDocPath || '/studio/index.html'));
+        let vaultPath = decodeURIComponent(u.pathname);
+        if (vaultPath === '/' || vaultPath === '/studio' || vaultPath === '/studio/') vaultPath = '/studio/index.html';
+        const { entry, buf } = await getDirectDecryptedBuffer(vaultPath);
+        if (d.method === 'HEAD') {
+          ev.source?.postMessage({ type: 'OZ_VAULT_RES', reqId: d.reqId, ok: true, mime: entry.t, size: entry.s, buf: new ArrayBuffer(0) }, '*');
+          return;
+        }
+        let outBuf = buf.slice(0);
+        if (d.asHtmlDoc || String(entry.t || '').includes('text/html')) {
+          const html = new TextDecoder().decode(outBuf);
+          const shim = '<script>' + buildDirectClientShimSource(vaultPath, u.search) + '<' + '/script>';
+          const patched = html.replace(/<head([^>]*)>/i, '<head$1>' + shim);
+          outBuf = new TextEncoder().encode(patched).buffer;
+        }
+        ev.source?.postMessage({ type: 'OZ_VAULT_RES', reqId: d.reqId, ok: true, mime: entry.t, size: outBuf.byteLength, buf: outBuf }, '*', [outBuf]);
+      } catch (err) {
+        ev.source?.postMessage({ type: 'OZ_VAULT_RES', reqId: d.reqId, ok: false, error: err?.message || 'Vault error' }, '*');
+      }
+    }
+  });
+
+  async function decryptIndexWithPassword(meta, encBuf, candidatePw) {
+    const candidates = [candidatePw];
+    const loweredFirst = candidatePw.length > 0 ? candidatePw[0].toLowerCase() + candidatePw.slice(1) : candidatePw;
+    if (loweredFirst !== candidatePw) candidates.push(loweredFirst);
+    const loweredAll = candidatePw.toLowerCase();
+    if (!candidates.includes(loweredAll)) candidates.push(loweredAll);
+
+    for (const pw of candidates) {
+      try {
+        const baseKey = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw), 'PBKDF2', false, ['deriveBits']);
+        const bits = await crypto.subtle.deriveBits(
+          { name: 'PBKDF2', salt: hexToBytes(meta.saltHex), iterations: meta.iterations, hash: 'SHA-256' },
+          baseKey,
+          256
+        );
+        const keyBits = new Uint8Array(bits);
+        const cryptoKey = await crypto.subtle.importKey('raw', keyBits, { name: 'AES-GCM' }, false, ['decrypt']);
+        const plainBuf = await crypto.subtle.decrypt(
+          { name: 'AES-GCM', iv: new Uint8Array(encBuf, 0, 12) },
+          cryptoKey,
+          new Uint8Array(encBuf, 12)
+        );
+        const files = JSON.parse(new TextDecoder().decode(plainBuf));
+        return { keyBits: Array.from(keyBits), files, saltHex: meta.saltHex, unlockedAt: Date.now() };
+      } catch {}
+    }
+    throw new Error('WRONG_PASSWORD');
+  }
+
+  // Đăng ký sớm Service Worker trước khi người dùng gõ mật khẩu
+  if ('serviceWorker' in navigator) {
+    try { navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(() => {}); } catch {}
+  }
+
+  formEl.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const cleanPw = pwInput.value.trim();
+    if (!cleanPw) return;
+    btnSubmit.disabled = true;
+    statusMsg.className = 'status ok';
+    statusMsg.textContent = 'Đang tải và giải mã kho dữ liệu Studio V13...';
+
+    let session = null;
+    try {
+      const meta = await fetch('./vault/meta.json?t=' + Date.now(), { cache: 'no-store' }).then((r) => {
+        if (!r.ok) throw new Error('META_FETCH_ERR');
+        return r.json();
+      });
+      const encBuf = await fetch('./' + meta.indexBlob + '?t=' + Date.now(), { cache: 'no-store' }).then((r) => {
+        if (!r.ok) throw new Error('INDEX_FETCH_ERR');
+        return r.arrayBuffer();
+      });
+      session = await decryptIndexWithPassword(meta, encBuf, cleanPw);
+    } catch (err) {
+      btnSubmit.disabled = false;
+      statusMsg.className = 'status';
+      statusMsg.textContent = err?.message === 'WRONG_PASSWORD'
+        ? 'Sai mật khẩu truy cập. Vui lòng kiểm tra lại.'
+        : 'Không tải được dữ liệu từ máy chủ GitHub Pages. Vui lòng thử tải lại trang.';
+      return;
+    }
+
+    await saveSession(session);
+    try {
+      await enterPortal(session);
+    } catch (err) {
+      statusMsg.className = 'status';
+      statusMsg.textContent = 'Lỗi mở cổng trình duyệt: ' + (err?.message || 'Không xác định');
+    } finally {
+      btnSubmit.disabled = false;
+    }
+  });
+
+  (async () => {
+    try {
+      const existing = await loadSession();
+      if (existing && existing.keyBits && existing.files) {
+        const meta = await fetch('./vault/meta.json?t=' + Date.now(), { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+        if (meta && existing.saltHex && existing.saltHex !== meta.saltHex) {
+          await clearSession();
+          return;
+        }
+        // Lấy lại mục lục vault mới nhất (bản cập nhật từng phần giữ nguyên salt) bằng khóa đã lưu.
+        if (meta && meta.indexBlob) {
+          try {
+            const encIdx = await fetch('./' + meta.indexBlob + '?t=' + Date.now(), { cache: 'no-store' }).then((r) => (r.ok ? r.arrayBuffer() : null));
+            if (encIdx) {
+              const k = await crypto.subtle.importKey('raw', new Uint8Array(existing.keyBits), { name: 'AES-GCM' }, false, ['decrypt']);
+              const plainIdx = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: new Uint8Array(encIdx, 0, 12) }, k, new Uint8Array(encIdx, 12));
+              existing.files = JSON.parse(new TextDecoder().decode(plainIdx));
+              await saveSession(existing);
+            }
+          } catch {}
+        }
+        statusMsg.className = 'status ok';
+        statusMsg.textContent = 'Đang khôi phục phiên đã đăng nhập...';
+        await enterPortal(existing);
+      }
+    } catch {}
+  })();
+</script>
+</body>
+</html>
